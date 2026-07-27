@@ -82,7 +82,10 @@ class VisualGridHuntGame:
             self.score -= 15
         else:
             self.agent_pos = new_pos
-            
+
+
+
+
 
         tuple_pos = tuple(self.agent_pos)
         if tuple_pos in self.food_positions:

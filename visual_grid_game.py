@@ -1,7 +1,7 @@
 # visual_grid_game.py
 import random
 import tkinter as tk
-
+from agent import SearchAgent
 
 class VisualGridHuntGame:
     """A flexible Pacman-style grid environment with support for configurable opponents and larger scales."""
@@ -90,6 +90,11 @@ class VisualGridHuntGame:
             # the agent has moved onto (and auto-consumed) it.
             'food_ahead': (not off_grid) and ahead_pos in self.food_positions,
             'collision': self.collision,
+
+            # --- Global state for the SearchAgent (Step 1.1) ---
+            'grid_size': (self.width, self.height),
+            'walls': list(self.walls),
+            'all_food': list(self.food_positions),
         }
 
     def execute_action(self, action: str):
@@ -155,7 +160,7 @@ class GridGameGUI:
 
         self.env = VisualGridHuntGame(width=width, height=height, num_food=num_food, num_opponents=num_opponents,
                                       custom_walls=walls)
-        self.agent = ModelBasedAgent()
+        self.agent = SearchAgent()
 
         # Dynamically calculate cell size so the total canvas fits nicely within a 600x600 window ceiling
         max_canvas_dim = 600

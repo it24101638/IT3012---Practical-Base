@@ -3,6 +3,9 @@
 from collections import deque
 import heapq
 import itertools
+import math
+import random
+
 
 class GreedyGridAgent:
     """A simple agent that tries to move around systematically to clear the grid."""
@@ -17,24 +20,18 @@ class GreedyGridAgent:
         return random.choice(self.actions_pool)
 
 
-
-
-
-
-
 class SearchAgent:
     """Plans an entire route to the nearest food pellet offline, using an
-    uninformed search algorithm, then executes that plan one action at a
-    time. Re-plans whenever the current plan runs out (i.e. after each
-    food pellet is reached).
+    uninformed OR informed search algorithm, then executes that plan one
+    action at a time. Re-plans whenever the current plan runs out.
 
     Position tracking: get_percept() never reports the agent's own (x, y),
     so this agent maintains its own belief of where it is, starting at the
     environment's known fixed start position (0, 0) and updating that
     belief after every action it takes. This is safe as long as the
     planned path only crosses cells the agent actually knows about (i.e.
-    known walls) — see the note in the lab writeup about toxic traps,
-    which are NOT exposed to this agent and can silently desync it.
+    known walls) — toxic traps are NOT exposed to this agent and can
+    silently desync it.
     """
 
     # Same axis-aligned deltas as VisualGridHuntGame.DIRECTIONS — movement
@@ -49,13 +46,13 @@ class SearchAgent:
 
     def __init__(self):
         self.plan = []
-        self.active_algo = 'UCS'          # 'BFS' | 'DFS' | 'UCS'
+        self.active_algo = 'BFS'          # 'BFS' | 'DFS' | 'UCS' | 'AStar'
+        self.heuristic_type = 'manhattan' # 'manhattan' | 'euclidean' — used by A*
         self.position = (0, 0)            # believed current position
 
-    # ------------------------------------------------------------------
-    # Shared helpers
-    # ------------------------------------------------------------------
 
+    # Shared helpers
+    
     def _clamp_move(self, state, action, grid_size):
         """Applies one action to a state with the same boundary clamping
         execute_action() uses. Does NOT check walls — callers do that."""
@@ -69,7 +66,9 @@ class SearchAgent:
     def _successors(self, state, walls, grid_size):
         """Yields (action, next_state) pairs for all four directions,
         skipping any move that's absorbed by a boundary clamp (no real
-        movement) or that lands on a known wall."""
+        movement) or that lands on a known wall. Reused by every search
+        method below, including astar_search, so "valid neighbor" means
+        exactly the same thing everywhere."""
         for action in self.DIRECTIONS:
             next_state = self._clamp_move(state, action, grid_size)
             if next_state == state:
@@ -86,9 +85,7 @@ class SearchAgent:
             key=lambda f: abs(f[0] - position[0]) + abs(f[1] - position[1])
         )
 
-    # ------------------------------------------------------------------
-    # Step 1.2 — the three uninformed search strategies
-    # ------------------------------------------------------------------
+    # Uninformed search (Week 3)
 
     def bfs_search(self, start, goal, walls, grid_size):
         """FIFO frontier -> explores shallowest nodes first."""
@@ -121,11 +118,7 @@ class SearchAgent:
         return []
 
     def ucs_search(self, start, goal, walls, grid_size):
-        """Priority queue ordered by path cost g(n). Every move costs 1
-        here, so UCS ends up equivalent to BFS in this environment — but
-        it's implemented as true cost-based search (reached tracks the
-        cheapest known cost to each state, and re-relaxes on a cheaper
-        find) so it generalizes if you ever add variable-cost terrain."""
+        """Priority queue ordered by path cost g(n)."""
         counter = itertools.count()  # tie-breaker so heapq never compares states/paths
         frontier = [(0, next(counter), start, [])]   # (cost, tiebreak, state, path)
         reached = {start: 0}
@@ -141,29 +134,33 @@ class SearchAgent:
                     heapq.heappush(frontier, (new_cost, next(counter), next_state, path + [action]))
         return []
 
-    # ------------------------------------------------------------------
-    # Step 1.3 — plan once, execute step by step
-    # ------------------------------------------------------------------
+    # Step 1.1 (Week 4) — heuristic functions
 
-    def sense_and_act(self, percept: dict) -> str:
-        if not self.plan:
-            goal = self._closest_food(self.position, percept['all_food'])
-            if goal is None:
-                return 'Up'  # no food left — nothing to plan toward
+    def manhattan_distance(self, pos, goal):
+        """h(n) = |x1 - x2| + |y1 - y2|. Admissible for 4-way movement —
+        see Part 2, Q2."""
+        x1, y1 = pos
+        x2, y2 = goal
+        return abs(x1 - x2) + abs(y1 - y2)
 
-            walls = set(percept['walls'])
-            grid_size = percept['grid_size']
+    def euclidean_distance(self, pos, goal):
+        """h(n) = sqrt((x1-x2)^2 + (y1-y2)^2) — straight-line distance."""
+        x1, y1 = pos
+        x2, y2 = goal
+        return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
-            search_fn = {
-                'BFS': self.bfs_search,
-                'DFS': self.dfs_search,
-                'UCS': self.ucs_search,
-            }[self.active_algo]
+    def _heuristic(self, pos, goal, heuristic_type):
+        """Thin dispatcher between the two heuristics above, keyed by
+        self.heuristic_type so astar_search doesn't need its own if/else."""
+        if heuristic_type == 'euclidean':
+            return self.euclidean_distance(pos, goal)
+        return self.manhattan_distance(pos, goal)
 
-            self.plan = search_fn(self.position, goal, walls, grid_size)
-            if not self.plan:
-                return 'Up'  # goal unreachable given known walls
+    
 
-        action = self.plan.pop(0)
-        self.position = self._clamp_move(self.position, action, percept['grid_size'])
-        return action
+
+if __name__ == "__main__":
+    # --- Step 1.1 testing checkpoint ---
+    _agent = SearchAgent()
+    print("Manhattan(0,0 -> 3,4):", _agent.manhattan_distance((0, 0), (3, 4)))  # expect 7
+    print("Euclidean(0,0 -> 3,4):", _agent.euclidean_distance((0, 0), (3, 4)))  # expect 5.0

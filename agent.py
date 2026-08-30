@@ -156,7 +156,7 @@ class SearchAgent:
             return self.euclidean_distance(pos, goal)
         return self.manhattan_distance(pos, goal)
 
-# Step 1.2 (Week 4) — A* search
+    # Step 1.2 (Week 4) — A* search
 
     def astar_search(self, start_pos, goal_pos, walls, grid_size, heuristic_type='manhattan'):
         """f(n) = g(n) + h(n). Node expansion reuses _successors(), so
@@ -185,6 +185,32 @@ class SearchAgent:
 
         return []  # unreachable
 
+    # Step 1.3 (Week 4) — plan once, execute step by step
+
+    def sense_and_act(self, percept: dict) -> str:
+        if not self.plan:
+            goal = self._closest_food(self.position, percept['all_food'])
+            if goal is None:
+                return 'Up'  # no food left — nothing to plan toward
+
+            walls = set(percept['walls'])
+            grid_size = percept['grid_size']
+
+            if self.active_algo == 'BFS':
+                self.plan = self.bfs_search(self.position, goal, walls, grid_size)
+            elif self.active_algo == 'DFS':
+                self.plan = self.dfs_search(self.position, goal, walls, grid_size)
+            elif self.active_algo == 'UCS':
+                self.plan = self.ucs_search(self.position, goal, walls, grid_size)
+            elif self.active_algo == 'AStar':
+                self.plan = self.astar_search(self.position, goal, walls, grid_size, self.heuristic_type)
+
+            if not self.plan:
+                return 'Up'  # goal unreachable given known walls
+
+        action = self.plan.pop(0)
+        self.position = self._clamp_move(self.position, action, percept['grid_size'])
+        return action
 
 
 if __name__ == "__main__":

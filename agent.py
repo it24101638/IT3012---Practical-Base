@@ -156,7 +156,35 @@ class SearchAgent:
             return self.euclidean_distance(pos, goal)
         return self.manhattan_distance(pos, goal)
 
-    
+# Step 1.2 (Week 4) — A* search
+
+    def astar_search(self, start_pos, goal_pos, walls, grid_size, heuristic_type='manhattan'):
+        """f(n) = g(n) + h(n). Node expansion reuses _successors(), so
+        "valid neighbor" (not a wall, in bounds) is identical to BFS/DFS/UCS —
+        only the ordering of the frontier differs."""
+        frontier = []
+        reached_states = set()
+
+        start_h = self._heuristic(start_pos, goal_pos, heuristic_type)
+        heapq.heappush(frontier, (start_h, 0, start_pos, []))  # (f_cost, g_cost, current_pos, path_taken)
+
+        while frontier:
+            f_cost, g_cost, current_pos, path_taken = heapq.heappop(frontier)
+
+            if current_pos == goal_pos:
+                return path_taken
+
+            reached_states.add(current_pos)
+
+            for action, next_pos in self._successors(current_pos, walls, grid_size):
+                if next_pos not in reached_states:
+                    g_new = g_cost + 1
+                    h_new = self._heuristic(next_pos, goal_pos, heuristic_type)
+                    f_new = g_new + h_new
+                    heapq.heappush(frontier, (f_new, g_new, next_pos, path_taken + [action]))
+
+        return []  # unreachable
+
 
 
 if __name__ == "__main__":
